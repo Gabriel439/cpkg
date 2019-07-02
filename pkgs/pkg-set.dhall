@@ -9,8 +9,25 @@ let not = https://raw.githubusercontent.com/dhall-lang/dhall-lang/master/Prelude
 in
 
 {- cpkg prelude imports -}
-let types = ../dhall/cpkg-types.dhall
-in
+let Arch = ../dhall/Arch.dhall
+
+let ABI = ../dhall/ABI.dhall
+
+let BuildVars = ../dhall/BuildVars.dhall
+
+let Command = ../dhall/Command.dhall
+
+let Dep = ../dhall/Dep.dhall
+
+let EnvVar = ../dhall/EnvVar.dhall
+
+let Manufacturer = ../dhall/Manufacturer.dhall
+
+let OS = ../dhall/OS.dhall
+
+let TargetTriple = ../dhall/TargetTriple.dhall
+
+let VersionBound = ../dhall/VersionBound.dhall
 
 let prelude = ../dhall/cpkg-prelude.dhall
 in
@@ -101,7 +118,7 @@ let cmake =
     let versionString = prelude.showVersion cfg.version
     in
     let cmakeConfigure =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         prelude.configureMkExesExtraFlags { bins = [ "bootstrap" ]
                                           , extraFlags = [ "--parallel=${Natural/show cfg.cpus}" ]
                                           } cfg
@@ -115,7 +132,7 @@ let cmake =
       , pkgSubdir = "cmake-${versionString}.${patchString}"
       , configureCommand = cmakeConfigure
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             let wrapper = "CMAKE_ROOT=${cfg.installDir}/share/cmake-${versionString}/ ${cfg.installDir}/bin/cmake $@"
             in
             let wrapped = "wrapper/cmake"
@@ -208,7 +225,7 @@ let glibc =
   in
 
   let glibcConfigure =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
 
       let maybeHost = prelude.mkHost cfg.targetTriple
       in
@@ -227,7 +244,7 @@ let glibc =
   in
 
   let glibcBuild =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call { program = prelude.makeExe cfg.buildOS
                      , arguments = [ "-j${Natural/show cfg.cpus}" ]
                      , environment = prelude.defaultEnv
@@ -237,7 +254,7 @@ let glibc =
   in
 
   let glibcInstall =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call { program = prelude.makeExe cfg.buildOS
                      , arguments = [ "install" ]
                      , environment = prelude.defaultEnv
@@ -285,7 +302,7 @@ let harfbuzz =
       , pkgBuildDeps = [ prelude.unbounded "pkg-config" ]
       , configureCommand = prelude.configureLinkExtraLibs [ "pcre", "z" ]
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.defaultInstall cfg
               # [ symlinkHarfbuzz "hb-aat-layout.h"
                 , symlinkHarfbuzz "hb-aat.h"
@@ -361,7 +378,7 @@ let ncurses =
     prelude.simplePackage { name = "ncurses", version = v } ⫽
       { pkgUrl = "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${prelude.showVersion v}.tar.gz"
       , configureCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           let crossArgs =
             if cfg.isCross
               then [ "--disable-stripping" ]
@@ -390,7 +407,7 @@ in
 
 let perl5 =
   let perlConfigure =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.mkExe "Configure"
       , prelude.call (prelude.defaultCall ⫽ { program = "./Configure"
                                             , arguments = [ "-des", "-Dprefix=${cfg.installDir}" ] # (if cfg.static then [] : List Text else [ "-Duseshrplib" ])
@@ -406,7 +423,7 @@ let perl5 =
       { pkgUrl = "https://www.cpan.org/src/${major}.0/perl-${prelude.showVersion v}.tar.gz"
       , configureCommand = perlConfigure
       , installCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           let libperlFile =
             if cfg.static
               then "libperl.a"
@@ -465,7 +482,7 @@ let vim =
                                                            ]
                                             }
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             let mkLibDynload =
               λ(libs : List Text) →
                 concatMapSep ":" Text (λ(dir : Text) → "${dir}/python2.7/lib-dynload") libs
@@ -508,7 +525,7 @@ let zlib =
   λ(v : List Natural) →
 
     let zlibConfigure =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
 
         let host =
           prelude.mkCCVar cfg
@@ -568,7 +585,7 @@ let gnutls =
                   , prelude.lowerBound { name = "p11-kit", lower = [0,23,1] }
                   ]
       , configureCommand =
-	λ(cfg : types.BuildVars) →
+	λ(cfg : BuildVars) →
 	  prelude.mkExes [ "src/gen-mech-list.sh" ]
 	    # prelude.configureLinkExtraLibs [ "nettle", "hogweed" ] cfg
       }
@@ -600,7 +617,7 @@ let cairo =
                  , prelude.unbounded "libXext"
                  ]
      , installCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           prelude.defaultInstall cfg #
             [ symlinkCairo "cairo-deprecated.h"
             , symlinkCairo "cairo-features.h"
@@ -648,14 +665,14 @@ in
 let patch =
   λ(v : List Natural) →
     prelude.makeGnuExe { name = "patch", version = v } ⫽
-      { pkgBuildDeps = [] : List types.Dep }
+      { pkgBuildDeps = [] : List Dep }
 in
 
 let m4 =
   λ(v : List Natural) →
     prelude.makeGnuExe { name = "m4", version = v } ⫽
       { configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             [ prelude.patch (./patches/m4.patch as Text) ]
               # prelude.defaultConfigure cfg
       , installCommand =
@@ -676,7 +693,7 @@ in
 
 let openssl =
   let opensslCfgVars =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       Some (prelude.mkCCVar cfg # prelude.configEnv ([] : List Text) cfg)
   in
 
@@ -684,7 +701,7 @@ let openssl =
     prelude.simplePackage { name = "openssl", version = v } ⫽
       { pkgUrl = "https://www.openssl.org/source/openssl-${prelude.showVersion v}c.tar.gz"
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             let sharedFlag =
               if cfg.static
                 then "no-shared"
@@ -749,7 +766,7 @@ let emacs =
                          ]
           }
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             if cfg.static
               then prelude.installWithBinaries [ "bin/emacs" ] cfg
               else prelude.installWithWrappers [ "emacs" ] cfg
@@ -786,7 +803,7 @@ let python =
     in
     let pyEnv =
       λ(_ : List Text) →
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         Some (prelude.configEnv ([] : List Text) cfg
           # [ { var = "CONFIG_SITE", value = "config.site" } ])
     in
@@ -795,7 +812,7 @@ let python =
       { pkgUrl = "https://www.python.org/ftp/python/${versionString}/Python-${versionString}.tar.xz"
       , pkgSubdir = "Python-${versionString}"
       , configureCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           let config =
             ''
             ac_cv_file__dev_ptmx=yes
@@ -821,7 +838,7 @@ let python =
                   , prelude.unbounded "ncurses"
                   ]
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.installWithBinaries [ "bin/python${major}" ] cfg
               # prelude.symlinkManpages [ { file = "share/man/man1/python${major}.1", section = 1 } ]
       -- , installCommand =
@@ -832,7 +849,7 @@ in
 let lua =
   λ(v : List Natural) →
     let printLuaOS =
-      λ(os : types.OS) →
+      λ(os : OS) →
         merge
           { FreeBSD   = "freebsd"
           , OpenBSD   = "bsd"
@@ -854,7 +871,7 @@ let lua =
     in
 
     let luaBuild =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         let cc = prelude.mkCCArg cfg
         in
 
@@ -877,7 +894,7 @@ let lua =
     in
 
     let luaInstall =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         [ prelude.call (prelude.defaultCall ⫽ { program = "make"
                                               , arguments = [ "install", "INSTALL_TOP=${cfg.installDir}" ]
                                               })
@@ -979,7 +996,7 @@ let freetype-shared =
       , pkgSubdir = "freetype-${versionString}"
       , pkgBuildDeps = [ prelude.unbounded "sed" ]
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.defaultInstall cfg
               # [ prelude.symlink "include/freetype2/ft2build.h" "include/ft2build.h"
                 , prelude.symlink "include/freetype2/freetype" "include/freetype"
@@ -1032,7 +1049,7 @@ let imageMagick =
       { pkgUrl = "https://imagemagick.org/download/ImageMagick-${versionString}-21.tar.xz"
       , pkgSubdir = "ImageMagick-${versionString}-21"
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.defaultInstall cfg
               # [ prelude.symlink "include/ImageMagick-${major}/MagickWand" "include/wand" ]
       }
@@ -1040,7 +1057,7 @@ in
 
 let gtk2 =
   let gtkEnv =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       prelude.defaultPath cfg # [ { var = "LDFLAGS", value = (prelude.mkLDFlags cfg.linkDirs).value ++ " -lpcre -lfribidi" }
                                 , prelude.mkCFlags cfg
                                 , prelude.mkPkgConfigVar cfg.linkDirs
@@ -1051,7 +1068,7 @@ let gtk2 =
                                 ]
   in
   let gtkConfig =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.mkExe "configure"
       , prelude.call (prelude.defaultCall ⫽ { program = "./configure"
                                             , arguments = [ "--prefix=${cfg.installDir}" ]
@@ -1076,11 +1093,11 @@ let gtk2 =
                   , prelude.lowerBound { name = "gdk-pixbuf", lower = [2,38,0] }
                   ]
       , buildCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.buildWith (gtkEnv cfg) cfg
       , configureCommand = gtkConfig
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.defaultInstall cfg #
               [ prelude.symlink "include/gdk-pixbuf-2.0/gdk-pixbuf" "include/gdk-pixbuf" ]
       }
@@ -1159,23 +1176,23 @@ let pango =
       ''
     in
     let no_gir =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         if cfg.isCross
           then
             [ prelude.writeFile { file = "meson_options.txt", contents = pangoCfgFile } ]
           else
-            ([] : List types.Command)
+            ([] : List Command)
     in
 
     prelude.simplePackage { name = "pango", version = prelude.fullVersion x } ⫽
       { pkgUrl = "http://ftp.gnome.org/pub/GNOME/sources/pango/${versionString}/pango-${fullVersion}.tar.xz"
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             no_gir cfg
               # prelude.mesonConfigure cfg
       , buildCommand = prelude.ninjaBuild
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.ninjaInstallWithPkgConfig (prelude.mesonMoves [ "pango.pc", "pangocairo.pc", "pangoft2.pc" ]) cfg
               # [ prelude.symlink "include/pango-1.0/pango" "include/pango" ]
       , pkgBuildDeps = [ prelude.lowerBound { name = "meson", lower = [0,48,0] }
@@ -1207,7 +1224,7 @@ let shared-mime-info =
     prelude.simplePackage { name = "shared-mime-info", version = v } ⫽
      { pkgUrl = "http://freedesktop.org/~hadess/shared-mime-info-${prelude.showVersion v}.tar.xz"
      , buildCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           [ prelude.call (prelude.defaultCall ⫽ { program = prelude.makeExe cfg.buildOS
                                                 , environment = Some (prelude.defaultPath cfg # [ prelude.libPath cfg
                                                                                                 , prelude.mkLDRunPath cfg.linkDirs
@@ -1216,7 +1233,7 @@ let shared-mime-info =
                                                 })
           ]
      , installCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           prelude.defaultInstall cfg
             # [ prelude.symlink "share/pkgconfig" "lib/pkgconfig" ]
      , pkgDeps = [ prelude.unbounded "glib"
@@ -1235,7 +1252,7 @@ let intltool =
     prelude.simplePackage { name = "intltool", version = v } ⫽
       { pkgUrl = "https://launchpad.net/intltool/trunk/${versionString}/+download/intltool-${versionString}.tar.gz"
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             [ prelude.patch (./patches/intltool.patch as Text)
             , prelude.mkExe "configure"
             , prelude.call (prelude.defaultCall ⫽ { program = "./configure"
@@ -1258,7 +1275,7 @@ let gdk-pixbuf =
 
     let gdkInstall =
       λ(fs : List { src : Text, dest : Text }) →
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         [ prelude.call (prelude.defaultCall ⫽ { program = "ninja"
                                               , environment = Some [ prelude.mkPkgConfigVar cfg.linkDirs
                                                                    , { var = "PATH", value = prelude.mkPathVar cfg.binDirs ++ ":${cfg.currentDir}/gdk-pixbuf-${fullVersion}/build/gdk-pixbuf:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
@@ -1306,7 +1323,7 @@ let meson =
     prelude.simplePackage { name = "meson", version = v } ⫽
       { pkgUrl = "https://github.com/mesonbuild/meson/archive/${prelude.showVersion v}.tar.gz"
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.python3Install cfg # prelude.mkPy3Wrapper "meson" cfg
       , buildCommand = prelude.doNothing
       , installCommand = prelude.doNothing
@@ -1316,7 +1333,7 @@ in
 
 let ninja =
   let ninjaConfigure =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.mkExe "configure.py"
       , prelude.mkExe "src/inline.sh"
       , prelude.call (prelude.defaultCall ⫽ { program = "./configure.py"
@@ -1326,7 +1343,7 @@ let ninja =
   in
 
   let ninjaInstall =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.copyFile "ninja" "bin/ninja"
       , prelude.symlinkBinary "bin/ninja"
       ]
@@ -1364,7 +1381,7 @@ let util-linux =
     prelude.simplePackage { name = "util-linux", version = prelude.fullVersion x } ⫽
       { pkgUrl = "https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v${versionString}/util-linux-${fullVersion}.tar.xz"
       , configureCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           let crossFlags =
             if cfg.isCross
               then [ "--disable-pylibmount"
@@ -1395,7 +1412,7 @@ let gobject-introspection =
       , pkgBuildDeps = [ prelude.unbounded "meson" ] -- prelude.unbounded "flex" "bison" ]
       , pkgDeps = [ prelude.lowerBound { name = "glib", lower = [2,58,0] } ]
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             [ prelude.mkExe "build/tools/g-ir-scanner" ]
               # prelude.ninjaInstall cfg
       }
@@ -1407,7 +1424,7 @@ let flex =
     in
     let flexEnv =
       λ(_ : List Text) →
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         Some (prelude.configEnv ([] : List Text) cfg
           # [ { var = "YFLAGS", value = "-Wno-error=yacc" } ])
     in
@@ -1430,7 +1447,7 @@ let glib =
     in
 
     let glibConfigure =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         let crossArgs =
           if cfg.isCross
             then [ "--cross-file", "cross.txt" ]
@@ -1469,7 +1486,7 @@ let glib =
       { pkgUrl = "http://ftp.gnome.org/pub/gnome/sources/glib/${versionString}/glib-${fullVersion}.tar.xz"
       , configureCommand = glibConfigure
       , buildCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           prelude.ninjaBuild cfg
             # prelude.mkExes [ "build/gobject/glib-mkenums"
                              , "build/gobject/glib-genmarshal"
@@ -1477,7 +1494,7 @@ let glib =
                              , "build/glib-gettextize"
                              ]
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.ninjaInstallWithPkgConfig (prelude.mesonMoves [ "glib-2.0.pc"
                                                                   , "gobject-2.0.pc"
                                                                   , "gio-2.0.pc"
@@ -1564,12 +1581,12 @@ let glib =
                 , symlinkGio "gio-autocleanups.h"
                 , symlinkGio "gio.h"
                 , symlinkGio "gioenums.h"
-                , symlinkGio "gioenumtypes.h"
+                , symlinkGio "gioenumh"
                 , symlinkGio "gioerror.h"
                 , symlinkGio "giomodule.h"
                 , symlinkGio "gioscheduler.h"
                 , symlinkGio "giostream.h"
-                , symlinkGio "giotypes.h"
+                , symlinkGio "gioh"
                 , symlinkGio "glistmodel.h"
                 , symlinkGio "gliststore.h"
                 , symlinkGio "gloadableicon.h"
@@ -1699,7 +1716,7 @@ let chickenScheme =
     in
 
     let printChickenOS =
-      λ(os : types.OS) →
+      λ(os : OS) →
         merge
           { FreeBSD   = "bsd"
           , OpenBSD   = "bsd"
@@ -1721,10 +1738,10 @@ let chickenScheme =
     in
 
     let chickenBuild =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         let cc =
-          Optional/fold types.TargetTriple cfg.targetTriple (List Text)
-            (λ(tgt : types.TargetTriple) → [ "C_COMPILER=${prelude.printTargetTriple tgt}-gcc" ])
+          Optional/fold TargetTriple cfg.targetTriple (List Text)
+            (λ(tgt : TargetTriple) → [ "C_COMPILER=${prelude.printTargetTriple tgt}-gcc" ])
               ([] : List Text)
         in
         let os =
@@ -1792,7 +1809,7 @@ let mkXLib =
 in
 
 let mkXLibDeps =
-  λ(x : { name : Text, deps : List types.Dep }) →
+  λ(x : { name : Text, deps : List Dep }) →
   λ(v : List Natural) →
     mkXLib x.name v ⫽
       { pkgDeps = x.deps }
@@ -1925,7 +1942,7 @@ let bzip2 =
     let versionString = prelude.showVersion v
     in
     let bzipInstall =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         [ prelude.call (prelude.defaultCall ⫽ { program = prelude.makeExe cfg.buildOS
                                               , arguments = cc cfg # [ "PREFIX=${cfg.installDir}", "install", "-j${Natural/show cfg.cpus}" ]
                                               })
@@ -1934,7 +1951,7 @@ let bzip2 =
         ]
     in
   let bzipShared =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = prelude.makeExe cfg.buildOS
                                             , arguments = [ "-f", "Makefile-libbz2_so" ]
                                             })
@@ -1974,7 +1991,7 @@ let libsepol =
   in
   -- TODO: proper separation
   let sepolInstall =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = prelude.makeExe cfg.buildOS
                                             , arguments = cc cfg # [ "PREFIX=${cfg.installDir}", "SHLIBDIR=${cfg.installDir}/lib", "CFLAGS=-Wno-error -O2", "install", "-j${Natural/show cfg.cpus}" ]
                                             , environment =
@@ -1998,7 +2015,7 @@ let libselinux =
   in
   -- TODO: proper separation
   let selinuxInstall =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = prelude.makeExe cfg.buildOS
                                             , arguments = cc cfg
                                                 # [ "PREFIX=${cfg.installDir}"
@@ -2138,7 +2155,7 @@ let gtk3 =
       concatMapSep " " Text (λ(dir : Text) → "-L${dir}") linkDirs
   in
   let gtkEnv =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       prelude.defaultPath cfg # [ { var = "LDFLAGS", value = (mkLDFlagsGtk cfg.linkDirs) ++ " -lpcre -lfribidi" }
                                 , prelude.mkPkgConfigVar cfg.linkDirs
                                 , prelude.mkLDPreload cfg.preloadLibs
@@ -2150,7 +2167,7 @@ let gtk3 =
                                 ]
   in
   let gtkConfig =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.mkExe "configure"
       , prelude.call (prelude.defaultCall ⫽ { program = "./configure"
                                             , arguments = [ "--prefix=${cfg.installDir}" ]
@@ -2164,7 +2181,7 @@ let gtk3 =
       { pkgName = "gtk3"
       , configureCommand = gtkConfig
       , buildCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.buildWith (gtkEnv cfg) cfg
       , pkgDeps = [ prelude.lowerBound { name = "pango", lower = [1,41,0] }
                   , prelude.unbounded "at-spi2-atk"
@@ -2211,14 +2228,14 @@ let lmdb =
   in
 
   let ar =
-    λ(cfg : types.BuildVars) →
-      Optional/fold types.TargetTriple cfg.targetTriple (List Text)
-        (λ(tgt : types.TargetTriple) → ["AR=${prelude.printTargetTriple tgt}-ar"])
+    λ(cfg : BuildVars) →
+      Optional/fold TargetTriple cfg.targetTriple (List Text)
+        (λ(tgt : TargetTriple) → ["AR=${prelude.printTargetTriple tgt}-ar"])
           ([] : List Text)
   in
 
   let lmdbInstall =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = "make"
                                             , arguments = cc cfg # ar cfg # [ "prefix=${cfg.installDir}", "install", "-j${Natural/show cfg.cpus}" ]
                                             , procDir = Some "libraries/liblmdb" -- TODO: path on windows?
@@ -2306,7 +2323,7 @@ let pygtk =
     mkGnomeSimple "pygtk" x ⫽
       { pkgUrl = "http://ftp.gnome.org/pub/gnome/sources/pygtk/${versionString}/pygtk-${fullVersion}.tar.bz2"
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.mkExes [ "py-compile" ]
               # prelude.preloadCfg cfg
       , pkgDeps = [ prelude.lowerBound { name = "glib", lower = [2,8,0] }
@@ -2416,7 +2433,7 @@ let m17n =
     prelude.simplePackage { name = "m17n-lib", version = v } ⫽
       { pkgUrl = "http://download.savannah.gnu.org/releases/m17n/m17n-lib-${prelude.showVersion v}.tar.gz"
       , buildCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
           [ prelude.call (prelude.defaultCall ⫽ { program = prelude.makeExe cfg.buildOS }) ]
       , pkgDeps = [ prelude.unbounded "libXt" ]
       }
@@ -2515,7 +2532,7 @@ let libopenjpeg =
       { pkgUrl = "https://github.com/uclouvain/openjpeg/archive/v${versionString}.tar.gz"
       , pkgSubdir = "openjpeg-${versionString}"
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.cmakeInstall cfg
               # [ prelude.symlink "lib/openjpeg-2.3/OpenJPEGConfig.cmake" "lib/OpenJPEGConfig.cmake" ]
       }
@@ -2563,11 +2580,11 @@ in
 let feh =
   let cc = prelude.mkCCArg
   let fehMake =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       { program = prelude.makeExe cfg.buildOS }
   let fehBuild =
     λ(v : List Natural) →
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ fehMake cfg ⫽
                         { arguments = [ "feh.1" ]
                         , procDir = Some "man"
@@ -2587,7 +2604,7 @@ let feh =
       ]
   in
   let fehInstall =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = prelude.makeExe cfg.buildOS
                                             , arguments = [ "CFLAGS=${(prelude.mkCFlags cfg).value}"
                                                           , "-j${Natural/show cfg.cpus}"
@@ -2657,7 +2674,7 @@ in
 
 let openssh =
   let opensshInstall =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = prelude.makeExe cfg.buildOS
                                             , arguments =
                                                 [ "PRIVSEP_PATH=${cfg.installDir}/var"
@@ -2807,7 +2824,7 @@ let nspr =
     let versionString = prelude.showVersion v
     in
     let bitFlag =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         if prelude.isX64 (prelude.archCfg cfg)
           then [ "--enable-64bit" ]
           else ([] : List Text)
@@ -2817,7 +2834,7 @@ let nspr =
       { pkgUrl = "https://archive.mozilla.org/pub/nspr/releases/v${versionString}/src/nspr-${versionString}.tar.gz"
       , pkgSubdir = "nspr-${versionString}/nspr"
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.configureWithFlags (bitFlag cfg) cfg
       }
 in
@@ -2933,7 +2950,7 @@ let libsoup =
                   ]
       , pkgBuildDeps = [ prelude.unbounded "vala" ]
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             [ prelude.writeFile { file = "meson_options.txt", contents = libsoupCfgFile } ]
               # prelude.mesonConfigure cfg
       , installCommand =
@@ -3037,7 +3054,7 @@ let node =
       { pkgUrl = "https://nodejs.org/dist/v${versionString}/node-v${versionString}.tar.gz"
       , pkgSubdir = "node-v${versionString}"
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.installWithBinaries [ "bin/node", "bin/npm" ] cfg
               # [ prelude.mkExe "${cfg.installDir}/lib/node_modules/npm/bin/npm-cli.js" ]
       }
@@ -3098,12 +3115,12 @@ in
 let libboost =
   -- TODO: use bootstrap.bat on windows
   let boostConfigure =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = "./bootstrap.sh" }) ]
   in
 
   let boostInstall =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = "./b2"
                                             , arguments = [ "install", "--prefix=${cfg.installDir}", "--without-python" ]
                                             })
@@ -3126,7 +3143,7 @@ in
 let llvm =
   λ(v : List Natural) →
     let llvmBuild =
-      λ(cfg : types.BuildVars) →
+      λ(cfg : BuildVars) →
         [ prelude.call { program = "cmake"
                        , arguments = [ "--build", ".", "--config", "Release", "--", "-j", "3" ]
                        , environment = prelude.defaultEnv
@@ -3161,7 +3178,7 @@ let pdfgrep =
                   , prelude.unbounded "libgcrypt"
                   ]
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.installWithWrappers [ "pdfgrep" ] cfg
               # prelude.symlinkManpages [ { file = "share/man/man1/pdfgrep.1", section = 1 } ]
       }
@@ -3181,10 +3198,10 @@ let gcc =
     prelude.simplePackage { name = "gcc", version = v } ⫽
       { pkgUrl = "http://mirror.linux-ia64.org/gnu/gcc/releases/gcc-${versionString}/gcc-${versionString}.tar.xz"
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             [ prelude.call { program = "contrib/download_prerequisites"
                            , arguments = [] : List Text
-                           , environment = None (List types.EnvVar)
+                           , environment = None (List EnvVar)
                            , procDir = None Text
                            }
             ] #
@@ -3226,7 +3243,7 @@ let poppler =
                   , prelude.unbounded "libpng"
                   ]
       , installCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             prelude.cmakeInstall cfg
               # prelude.mkLDPathWrappers cfg [ "pdfdetach"
                                              , "pdffonts"
@@ -3292,7 +3309,7 @@ let phash =
                        , prelude.unbounded "libtool"
                        ]
       , configureCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             [ prelude.patch (./patches/pHash.patch as Text)
             , prelude.call { program = "autoreconf"
                            , arguments = [ "-i" ]
@@ -3312,11 +3329,11 @@ let cimg =
     let versionString = prelude.showVersion v in
     prelude.simplePackage { name = "CImg", version = v } ⫽
       { pkgUrl = "http://cimg.eu/files/CImg_${versionString}.zip"
-      , pkgBuildDeps = [] : List types.Dep
+      , pkgBuildDeps = [] : List Dep
       , configureCommand = prelude.doNothing
       , buildCommand = prelude.doNothing
       , installCommand =
-          λ(_ : types.BuildVars) →
+          λ(_ : BuildVars) →
             [ prelude.copyFile "CImg.h" "include/CImg.h" ]
       }
 in
@@ -3363,13 +3380,13 @@ let make =
       { pkgUrl = "https://ftp.gnu.org/gnu/make/make-${prelude.showVersion v}.tar.bz2"
       , configureCommand = prelude.configureWithPatch (./patches/make.patch as Text)
       , buildCommand =
-          λ(cfg : types.BuildVars) →
+          λ(cfg : BuildVars) →
             [ prelude.call (prelude.defaultCall ⫽ { program = "./build.sh"
                                                   , environment = Some (prelude.buildEnv cfg)
                                                   })
             ]
       , installCommand =
-          λ(_ : types.BuildVars) →
+          λ(_ : BuildVars) →
             [ prelude.copyFile "make" "bin/make"
             , prelude.symlinkBinary "bin/make"
             ]
@@ -3379,7 +3396,7 @@ in
 
 let mercury =
   let mercuryBuild =
-    λ(cfg : types.BuildVars) →
+    λ(cfg : BuildVars) →
       [ prelude.call (prelude.defaultCall ⫽ { program = "make"
                                             , arguments = [ "PARALLEL=-j${Natural/show cfg.cpus}" ]
                                             , environment = Some (prelude.buildEnv cfg)
@@ -3439,7 +3456,7 @@ let lz4 =
       { pkgUrl = "https://github.com/lz4/lz4/archive/v${prelude.showVersion v}.tar.gz"
       , configureCommand = prelude.doNothing
       , installCommand =
-        λ(cfg : types.BuildVars) →
+        λ(cfg : BuildVars) →
             [ prelude.call (prelude.defaultCall ⫽ { program = "make"
                                                   , arguments = [ "PREFIX=${cfg.installDir}", "install" ]
                                                   , environment = Some (prelude.buildEnv cfg)

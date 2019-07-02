@@ -18,8 +18,25 @@ let not = https://raw.githubusercontent.com/dhall-lang/dhall-lang/master/Prelude
 in
 
 {- Imported types -}
-let types = ../dhall/cpkg-types.dhall
-in
+let Arch = ./Arch.dhall
+
+let ABI = ./ABI.dhall
+
+let BuildVars = ./BuildVars.dhall
+
+let Command = ./Command.dhall
+
+let Dep = ./Dep.dhall
+
+let EnvVar = ./EnvVar.dhall
+
+let Manufacturer = ./Manufacturer.dhall
+
+let OS = ./OS.dhall
+
+let TargetTriple = ./TargetTriple.dhall
+
+let VersionBound = ./VersionBound.dhall
 
 let showVersion =
   concatMapSep "." Natural Natural/show
@@ -34,7 +51,7 @@ in
 
 {- Print the architecture for use with GCC -}
 let printArch =
-  λ(arch : types.Arch) →
+  λ(arch : Arch) →
     merge
       { X64           = "x86_64"
       , AArch         = "aarch64"
@@ -64,7 +81,7 @@ let printArch =
 in
 
 let printManufacturer =
-  λ(x : types.Manufacturer) →
+  λ(x : Manufacturer) →
     merge
       { Unknown = "unknown"
       , Apple   = "apple"
@@ -75,7 +92,7 @@ let printManufacturer =
 in
 
 let printOS =
-  λ(os : types.OS) →
+  λ(os : OS) →
     merge
       { FreeBSD   = "freebsd"
       , OpenBSD   = "openbsd"
@@ -98,7 +115,7 @@ in
 
 {- Print the ABI for use with GCC -}
 let printABI =
-  λ(os : types.ABI) →
+  λ(os : ABI) →
     merge
       { GNU       = "gnu"
       , GNUabi64  = "gnuabi64"
@@ -112,18 +129,18 @@ in
 
 {- Print target triple for use with GCC -}
 let printTargetTriple =
-  λ(t : types.TargetTriple) →
-    "${printArch t.arch}-${printOS t.os}" ++ Optional/fold types.ABI t.abi Text (λ(abi : types.ABI) → "-${printABI abi}") ""
+  λ(t : TargetTriple) →
+    "${printArch t.arch}-${printOS t.os}" ++ Optional/fold ABI t.abi Text (λ(abi : ABI) → "-${printABI abi}") ""
 in
 
 {- Print --host flag for use with ./configure scripts -}
 let mkHost =
-  mapOptional types.TargetTriple Text (λ(tgt : types.TargetTriple) → "--host=${printTargetTriple tgt}")
+  mapOptional TargetTriple Text (λ(tgt : TargetTriple) → "--host=${printTargetTriple tgt}")
 in
 
 {- Pick executable for 'make'. Use 'gmake' on BSDs, 'make' everywhere else. -}
 let makeExe =
-  λ(os : types.OS) →
+  λ(os : OS) →
 
     merge
       { FreeBSD   = "gmake"
@@ -147,24 +164,24 @@ in
 
 let mkExe =
   λ(x : Text) →
-    types.Command.MakeExecutable { file = x }
+    Command.MakeExecutable { file = x }
 in
 
 let mkExes =
-  map Text types.Command mkExe
+  map Text Command mkExe
 in
 
 let writeFile =
-  types.Command.Write
+  Command.Write
 in
 
 let patch =
   λ(x : Text) →
-    types.Command.Patch { patchContents = x }
+    Command.Patch { patchContents = x }
 in
 
 let defaultEnv =
-  None (List types.EnvVar)
+  None (List EnvVar)
 in
 
 let defaultCall =
@@ -175,41 +192,41 @@ let defaultCall =
 in
 
 let call =
-  types.Command.Call
+  Command.Call
 in
 
 let symlinkBinary =
   λ(file : Text) →
-    types.Command.SymlinkBinary { file = file }
+    Command.SymlinkBinary { file = file }
 in
 
 let symlinkManpage =
-    types.Command.SymlinkManpage
+    Command.SymlinkManpage
 in
 
 let symlink =
   λ(tgt : Text) →
   λ(lnk : Text) →
-    types.Command.Symlink { tgt = tgt, linkName = lnk }
+    Command.Symlink { tgt = tgt, linkName = lnk }
 in
 
 let copyFile =
   λ(src : Text) →
   λ(dest : Text) →
-    types.Command.CopyFile { src = src, dest = dest }
+    Command.CopyFile { src = src, dest = dest }
 in
 
 let symlinkBinaries =
-  map Text types.Command symlinkBinary
+  map Text Command symlinkBinary
 in
 
 let symlinkManpages =
-  map { file : Text, section : Natural } types.Command symlinkManpage
+  map { file : Text, section : Natural } Command symlinkManpage
 in
 
 {- This is to be used on the build OS -}
 let isUnix =
-  λ(os : types.OS) →
+  λ(os : OS) →
 
     merge
       { FreeBSD   = True
@@ -277,17 +294,17 @@ in
    just use the build OS as detected by cpkg
    -}
 let osCfg =
-  λ(cfg : types.BuildVars) →
-    Optional/fold types.TargetTriple cfg.targetTriple types.OS
-      (λ(tgt : types.TargetTriple) → tgt.os)
+  λ(cfg : BuildVars) →
+    Optional/fold TargetTriple cfg.targetTriple OS
+      (λ(tgt : TargetTriple) → tgt.os)
         cfg.buildOS
 in
 
 {- Get the host architecture for the build, using the method above -}
 let archCfg =
-  λ(cfg : types.BuildVars) →
-    Optional/fold types.TargetTriple cfg.targetTriple types.Arch
-      (λ(tgt : types.TargetTriple) → tgt.arch)
+  λ(cfg : BuildVars) →
+    Optional/fold TargetTriple cfg.targetTriple Arch
+      (λ(tgt : TargetTriple) → tgt.arch)
         cfg.buildArch
 in
 
@@ -296,7 +313,7 @@ in
    we install libraries to nonstandard locations.
    -}
 let mkPerlLib =
-  λ(x : { libDirs : List Text, perlVersion : List Natural, cfg : types.BuildVars }) →
+  λ(x : { libDirs : List Text, perlVersion : List Natural, cfg : BuildVars }) →
     let os = x.cfg.buildOS
     in
     let arch = x.cfg.buildArch
@@ -318,7 +335,7 @@ let mkIncludePath =
 in
 
 let mkCFlags =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let flag = concatMapSep " " Text (λ(dir : Text) → "-I${dir}") cfg.includeDirs
     in
     let staFlag =
@@ -353,17 +370,17 @@ let mkPathVar =
 in
 
 let defaultPath =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     if isUnix cfg.buildOS
-      then [ { var = "PATH", value = mkPathVar cfg.binDirs ++ "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" } ] : List types.EnvVar
-      else [] : List types.EnvVar -- FIXME: handle non-unix case
+      then [ { var = "PATH", value = mkPathVar cfg.binDirs ++ "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" } ] : List EnvVar
+      else [] : List EnvVar -- FIXME: handle non-unix case
 in
 
 {- Set either LD_LIBRARY_PATH or LIBRARY_PATH depending on whether we are doing
    a static build or not
    -}
 let libPath =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     if cfg.static
       then
         mkStaPath cfg.linkDirs
@@ -383,7 +400,7 @@ in
 {- Default environment variables for a given configuration -}
 let configEnv =
   λ(linkLibs : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     defaultPath cfg # [ mkLDFlagsGeneral cfg.linkDirs linkLibs
                       , mkCFlags cfg
                       , mkPkgConfigVar (cfg.shareDirs # cfg.linkDirs)
@@ -394,7 +411,7 @@ let configEnv =
 in
 
 let buildEnv =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     defaultPath cfg # [ mkPkgConfigVar (cfg.shareDirs # cfg.linkDirs)
                       , mkPerlLib { libDirs = cfg.linkDirs, perlVersion = [5,30,0], cfg = cfg } -- TODO: take this as a parameter
                       , mkLDPath cfg.linkDirs
@@ -403,7 +420,7 @@ in
 
 let configSome =
   λ(linkLibs : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     Some (configEnv linkLibs cfg)
 in
 
@@ -411,11 +428,11 @@ in
    defaultConfigure
    -}
 let generalConfigure =
-  λ(envVars : List Text → types.BuildVars → Optional (List types.EnvVar)) →
+  λ(envVars : List Text → BuildVars → Optional (List EnvVar)) →
   λ(filename : Text) →
   λ(linkLibs : List Text) →
   λ(extraFlags : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let maybeHost = mkHost cfg.targetTriple
     in
     let modifyArgs = maybeAppend Text maybeHost
@@ -430,7 +447,7 @@ let generalConfigure =
 in
 
 let configWithEnv =
-  λ(envVars : List Text → types.BuildVars → Optional (List types.EnvVar)) →
+  λ(envVars : List Text → BuildVars → Optional (List EnvVar)) →
     generalConfigure envVars "configure" ([] : List Text) ([] : List Text)
 in
 
@@ -457,7 +474,7 @@ in
 
 let configureMkExesExtraFlags =
   λ(x : { bins : List Text, extraFlags : List Text }) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     mkExes x.bins
       # configureWithFlags x.extraFlags cfg
 in
@@ -468,8 +485,8 @@ let configureMkExes =
 in
 
 let buildWith =
-  λ(envs : List types.EnvVar) →
-  λ(cfg : types.BuildVars) →
+  λ(envs : List EnvVar) →
+  λ(cfg : BuildVars) →
     [ call (defaultCall ⫽ { program = makeExe cfg.buildOS
                           , arguments = [ "-j${Natural/show cfg.cpus}" ]
                           , environment =
@@ -479,13 +496,13 @@ let buildWith =
 in
 
 let defaultBuild =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     buildWith (buildEnv cfg) cfg
 in
 
 let installWith =
-  λ(envs : List types.EnvVar) →
-  λ(cfg : types.BuildVars) →
+  λ(envs : List EnvVar) →
+  λ(cfg : BuildVars) →
     [ call (defaultCall ⫽ { program = makeExe cfg.buildOS
                           , arguments = [ "install" ]
                           , environment =
@@ -495,46 +512,46 @@ let installWith =
 in
 
 let defaultInstall =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     installWith (buildEnv cfg) cfg
 in
 
 let installWithBinaries =
   λ(bins : List Text) →
-  λ(installVars : types.BuildVars) →
+  λ(installVars : BuildVars) →
     defaultInstall installVars
       # (if not installVars.isCross
             then symlinkBinaries bins
-            else [] : List types.Command)
+            else [] : List Command)
 in
 
 let installWithManpages =
   λ(mans : List { file : Text, section : Natural }) →
-  λ(installVars : types.BuildVars) →
+  λ(installVars : BuildVars) →
     defaultInstall installVars
       # (if not installVars.isCross
             then symlinkManpages mans
-            else [] : List types.Command)
+            else [] : List Command)
 in
 
 let unbounded =
   λ(x : Text) →
     { name = x
-    , bound = types.VersionBound.NoBound
+    , bound = VersionBound.NoBound
     }
 in
 
 let lowerBound =
   λ(pkg : { name : Text, lower : List Natural }) →
     { name = pkg.name
-    , bound = types.VersionBound.Lower { lower = pkg.lower }
+    , bound = VersionBound.Lower { lower = pkg.lower }
     }
 in
 
 let upperBound =
   λ(pkg : { name : Text, upper : List Natural }) →
     { name = pkg.name
-    , bound = types.VersionBound.Upper { upper = pkg.upper }
+    , bound = VersionBound.Upper { upper = pkg.upper }
     }
 in
 
@@ -542,8 +559,8 @@ let defaultPackage =
   { configureCommand = defaultConfigure
   , buildCommand     = defaultBuild
   , installCommand   = defaultInstall
-  , pkgBuildDeps     = [] : List types.Dep
-  , pkgDeps          = [] : List types.Dep
+  , pkgBuildDeps     = [] : List Dep
+  , pkgDeps          = [] : List Dep
   , pkgStream        = True
   }
 in
@@ -576,11 +593,11 @@ in
 
 let createDir =
   λ(x : Text) →
-    types.Command.CreateDirectory { dir = x }
+    Command.CreateDirectory { dir = x }
 in
 
 let printCMakeOS =
-  λ(os : types.OS) →
+  λ(os : OS) →
     merge
       { FreeBSD   = "BSD"
       , OpenBSD   = "BSD"
@@ -602,17 +619,17 @@ let printCMakeOS =
 in
 
 let cmakeConfigureGeneral =
-  λ(envVars : types.BuildVars → Optional (List types.EnvVar)) →
+  λ(envVars : BuildVars → Optional (List EnvVar)) →
   λ(flags : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let host =
-      Optional/fold types.TargetTriple cfg.targetTriple (List Text)
-        (λ(tgt : types.TargetTriple) → ["-DCMAKE_C_COMPILER=${printTargetTriple tgt}-gcc", "-DCMAKE_CXX_COMPILER=${printTargetTriple tgt}-g++"])
+      Optional/fold TargetTriple cfg.targetTriple (List Text)
+        (λ(tgt : TargetTriple) → ["-DCMAKE_C_COMPILER=${printTargetTriple tgt}-gcc", "-DCMAKE_CXX_COMPILER=${printTargetTriple tgt}-g++"])
           (["-DCMAKE_C_COMPILER=cc", "-DCMAKE_CXX_COMPILER=c++"])
     in
     let system =
-      Optional/fold types.TargetTriple cfg.targetTriple (List Text)
-        (λ(tgt : types.TargetTriple) → ["-DCMAKE_SYSTEM_NAME=${printCMakeOS tgt.os}"])
+      Optional/fold TargetTriple cfg.targetTriple (List Text)
+        (λ(tgt : TargetTriple) → ["-DCMAKE_SYSTEM_NAME=${printCMakeOS tgt.os}"])
           ([] : List Text)
     in
 
@@ -626,7 +643,7 @@ let cmakeConfigureGeneral =
 in
 
 let cmakeEnv =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     [ mkPkgConfigVar (cfg.shareDirs # cfg.linkDirs)
     , { var = "CMAKE_INCLUDE_PATH", value = (mkIncludePath cfg.includeDirs).value }
     , { var = "CMAKE_LIBRARY_PATH", value = (libPath cfg).value }
@@ -635,7 +652,7 @@ let cmakeEnv =
 in
 
 let cmakeSome =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     Some (cmakeEnv cfg)
 in
 
@@ -648,16 +665,16 @@ let cmakeConfigure =
 in
 
 let cmakeConfigureNinja =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let host =
-      Optional/fold types.TargetTriple cfg.targetTriple (List Text)
-        (λ(tgt : types.TargetTriple) → ["-DCMAKE_C_COMPILER=${printTargetTriple tgt}-gcc", "-DCMAKE_CXX_COMPILER=${printTargetTriple tgt}-g++"])
+      Optional/fold TargetTriple cfg.targetTriple (List Text)
+        (λ(tgt : TargetTriple) → ["-DCMAKE_C_COMPILER=${printTargetTriple tgt}-gcc", "-DCMAKE_CXX_COMPILER=${printTargetTriple tgt}-g++"])
           ([] : List Text)
     in
 
     let system =
-      Optional/fold types.TargetTriple cfg.targetTriple (List Text)
-        (λ(tgt : types.TargetTriple) → ["-DCMAKE_SYSTEM_NAME=${printCMakeOS tgt.os}"])
+      Optional/fold TargetTriple cfg.targetTriple (List Text)
+        (λ(tgt : TargetTriple) → ["-DCMAKE_SYSTEM_NAME=${printCMakeOS tgt.os}"])
           ([] : List Text)
     in
 
@@ -671,7 +688,7 @@ let cmakeConfigureNinja =
 in
 
 let perlConfigure =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
 
   [ call { program = "perl"
          , arguments = [ "Makefile.PL", "PREFIX=${cfg.installDir}" ]
@@ -682,7 +699,7 @@ let perlConfigure =
 in
 
 let cmakeBuild =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     [ call { program = "cmake"
            , arguments = [ "--build", ".", "--config", "Release", "--", "-j", Natural/show cfg.cpus ]
            , environment = defaultEnv
@@ -692,7 +709,7 @@ let cmakeBuild =
 in
 
 let cmakeInstall =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     [ call { program = "cmake"
            , arguments = [ "--build", ".", "--target", "install", "--config", "Release" ]
            , environment = defaultEnv
@@ -703,7 +720,7 @@ in
 
 let cmakeInstallWithBinaries =
   λ(bins : List Text) →
-  λ(installVars : types.BuildVars) →
+  λ(installVars : BuildVars) →
     cmakeInstall installVars
       # symlinkBinaries bins
 in
@@ -718,7 +735,7 @@ let cmakePackage =
 in
 
 let autogenConfigure =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     [ mkExe "autogen.sh"
     , call (defaultCall ⫽ { program = "./autogen.sh"
                           , environment = Some ( [ mkAclocalPath cfg.shareDirs ]
@@ -747,10 +764,10 @@ in
 
 {- Write a cross-compilation configuration file for use with meson -}
 let mesonCfgFile =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let prefix =
-      Optional/fold types.TargetTriple cfg.targetTriple Text
-        (λ(tgt : types.TargetTriple) → "${printTargetTriple tgt}-")
+      Optional/fold TargetTriple cfg.targetTriple Text
+        (λ(tgt : TargetTriple) → "${printTargetTriple tgt}-")
           ""
     in
 
@@ -769,7 +786,7 @@ let mesonCfgFile =
 in
 
 let mesonEnv =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     Some [ mkPkgConfigVar cfg.linkDirs
          , { var = "PATH", value = mkPathVar cfg.binDirs ++ "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
          , mkPy3Path cfg.linkDirs
@@ -782,9 +799,9 @@ let mesonEnv =
 in
 
 let mesonConfigureGeneral =
-  λ(envs : types.BuildVars → Optional (List types.EnvVar)) →
+  λ(envs : BuildVars → Optional (List EnvVar)) →
   λ(flags : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let crossArgs =
       if cfg.isCross
         then [ "--cross-file", "cross.txt" ]
@@ -811,7 +828,7 @@ in
 
 let ninjaBuildWith =
   λ(linkLibs : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     [ call (defaultCall ⫽ { program = "ninja"
                           , environment = Some [ mkPkgConfigVar cfg.linkDirs
                                                , { var = "PATH", value = mkPathVar cfg.binDirs ++ "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
@@ -830,7 +847,7 @@ let ninjaBuild =
 in
 
 let ninjaInstall =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     [ call (defaultCall ⫽ { program = "ninja"
                           , environment = Some [ mkPkgConfigVar cfg.linkDirs
                                                , { var = "PATH", value = mkPathVar cfg.binDirs ++ "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
@@ -859,17 +876,17 @@ let ninjaPackage =
 in
 
 let copyFiles =
-  map { src : Text, dest : Text } types.Command types.Command.CopyFile
+  map { src : Text, dest : Text } Command Command.CopyFile
 in
 
 let ninjaInstallWithPkgConfig =
   λ(fs : List { src : Text, dest : Text }) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     ninjaInstall cfg # copyFiles fs
 in
 
 let doNothing =
-  λ(_ : types.BuildVars) → [] : List types.Command
+  λ(_ : BuildVars) → [] : List Command
 in
 
 let mesonMoves =
@@ -878,7 +895,7 @@ in
 
 let pythonBuild =
   λ(version : List Natural) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let major = Optional/fold Natural (List/head Natural version) Text (Natural/show) ""
     in
     let versionString = showVersion version
@@ -896,7 +913,7 @@ in
 
 let pythonInstall =
   λ(version : List Natural) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let major = Optional/fold Natural (List/head Natural version) Text (Natural/show) ""
     in
     let versionString = showVersion version
@@ -942,10 +959,10 @@ let python2Package =
 in
 
 let mkCCVar =
-  λ(cfg : types.BuildVars) →
-    Optional/fold types.TargetTriple cfg.targetTriple (List types.EnvVar)
-      (λ(tgt : types.TargetTriple) → [{ var = "CC", value = "${printTargetTriple tgt}-gcc" }])
-        ([] : List types.EnvVar)
+  λ(cfg : BuildVars) →
+    Optional/fold TargetTriple cfg.targetTriple (List EnvVar)
+      (λ(tgt : TargetTriple) → [{ var = "CC", value = "${printTargetTriple tgt}-gcc" }])
+        ([] : List EnvVar)
 in
 
 let squishVersion =
@@ -953,15 +970,15 @@ let squishVersion =
 in
 
 let mkCCArg =
-  λ(cfg : types.BuildVars) →
-    Optional/fold types.TargetTriple cfg.targetTriple (List Text)
-      (λ(tgt : types.TargetTriple) → ["CC=${printTargetTriple tgt}-gcc"])
+  λ(cfg : BuildVars) →
+    Optional/fold TargetTriple cfg.targetTriple (List Text)
+      (λ(tgt : TargetTriple) → ["CC=${printTargetTriple tgt}-gcc"])
         ([] : List Text)
 in
 
 let preloadEnv =
   λ(_ : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     Some (defaultPath cfg # [ mkLDFlags cfg.linkDirs
                             , mkCFlags cfg
                             , mkPkgConfigVar cfg.linkDirs
@@ -977,7 +994,7 @@ let preloadCfg =
 in
 
 let printEnvVar =
-  λ(var : types.EnvVar) →
+  λ(var : EnvVar) →
     "${var.var}=${var.value}"
 in
 
@@ -988,7 +1005,7 @@ in
 let mkPyWrapper =
   λ(version : List Natural) →
   λ(binName : Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     let wrapperContents = "${printEnvVar (libPath cfg)} ${printEnvVar (mkPyPath version cfg.linkDirs)}:${cfg.installDir}/lib/python${showVersion version}/site-packages ${cfg.installDir}/bin/${binName} $@"
     in
     let wrapped = "wrapper/${binName}"
@@ -1013,9 +1030,9 @@ in
 let installWithPyWrappers =
   λ(version : List Natural) →
   λ(binNames : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     pythonInstall version cfg
-      # concatMap Text types.Command (λ(bin : Text) → mkPyWrapper version bin cfg) binNames
+      # concatMap Text Command (λ(bin : Text) → mkPyWrapper version bin cfg) binNames
 in
 
 let installWithPy3Wrappers =
@@ -1029,7 +1046,7 @@ in
    For an example use, see the emacs package.
    -}
 let mkLDPathWrapper =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
   λ(binName : Text) →
     let wrapper = "${printEnvVar (mkLDPath cfg.linkDirs)}:${cfg.installDir}/lib LD_PRELOAD='${(mkLDPreload cfg.preloadLibs).value}' ${cfg.installDir}/bin/${binName} $@"
     in
@@ -1045,15 +1062,15 @@ let mkLDPathWrapper =
 in
 
 let mkLDPathWrappers =
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
   λ(bins : List Text) →
-    concatMap Text types.Command (λ(bin : Text) → mkLDPathWrapper cfg bin) bins
+    concatMap Text Command (λ(bin : Text) → mkLDPathWrapper cfg bin) bins
     -- TODO: add to PATH for e.g. PERL interpreter
 in
 
 let installWithWrappers =
   λ(bins : List Text) →
-  λ(cfg : types.BuildVars) →
+  λ(cfg : BuildVars) →
     defaultInstall cfg #
       mkLDPathWrappers cfg bins
 in
@@ -1063,7 +1080,7 @@ let underscoreVersion =
 in
 
 let isX64 =
-  λ(arch : types.Arch) →
+  λ(arch : Arch) →
     merge
       { X64           = True
       , AArch         = False
@@ -1094,8 +1111,8 @@ in
 
 let configureWithPatches =
   λ(patches : List Text) →
-  λ(cfg : types.BuildVars) →
-    map Text types.Command (λ(p : Text) → patch p) patches
+  λ(cfg : BuildVars) →
+    map Text Command (λ(p : Text) → patch p) patches
       # defaultConfigure cfg
 in
 
