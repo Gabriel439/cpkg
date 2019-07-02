@@ -1,0 +1,24 @@
+< X64
+| AArch
+| Arm
+| RISCV64
+| PowerPC
+| PowerPC64
+| PowerPC64le
+| Sparc64
+| S390x
+| Alpha
+| M68k
+| Mips
+| MipsEl
+| Mips64
+| Mips64El
+| X86
+| SH4
+| HPPA
+| HPPA64
+| MipsIsa32r6El
+| MipsIsa32r6
+| MipsIsa64r6El
+| MipsIsa64r6
+>
